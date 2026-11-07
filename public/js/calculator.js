@@ -12,7 +12,10 @@
     const OPERATORS = ['+', '-', '*', '/', '^'];
     const FUNCTIONS = ['asin(', 'acos(', 'atan(', 'sqrt(', 'sin(', 'cos(', 'tan(', 'log(', 'exp(', 'ln(', 'abs('];
 
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const el = {
+        card: document.querySelector('.calculator'),
         expression: document.getElementById('displayExpression'),
         value: document.getElementById('displayValue'),
         angleIndicator: document.getElementById('angleIndicator'),
@@ -30,7 +33,13 @@
         soundToggle: document.getElementById('soundToggle'),
         themeToggle: document.getElementById('themeToggle'),
         toast: document.getElementById('toast'),
+        calcDisplay: document.getElementById('calcDisplay'),
+        keypadWrapper: document.getElementById('keypadWrapper'),
+        keyboardHint: document.getElementById('keyboardHint'),
+        cryptoPanel: document.getElementById('cryptoPanel'),
     };
+
+    const MODES = ['standard', 'scientific', 'crypto'];
 
     const storage = {
         get(key, fallback) {
@@ -293,10 +302,12 @@
             state.justEvaluated = true;
             state.history = data.history;
             renderHistory();
+            replayAnimation(el.value, 'anim-result');
             return data.result;
         } catch (err) {
             state.error = err.message;
             state.justEvaluated = false;
+            replayAnimation(el.value, 'anim-error');
             return null;
         } finally {
             state.busy = false;
@@ -445,32 +456,42 @@
             li.tabIndex = 0;
             li.title = 'Pakai hasil ini';
 
+            const isCrypto = item.mode === 'crypto';
+            if (isCrypto) {
+                li.classList.add('is-crypto');
+                li.title = 'Salin hasil';
+            }
+
             const icon = document.createElement('span');
             icon.className = 'history-icon';
-            icon.innerHTML = item.mode === 'scientific'
-                ? '<i class="fa-solid fa-flask"></i>'
-                : '<i class="fa-solid fa-calculator"></i>';
+            icon.innerHTML = {
+                scientific: '<i class="fa-solid fa-flask"></i>',
+                crypto: '<i class="fa-solid fa-key"></i>',
+            }[item.mode] || '<i class="fa-solid fa-calculator"></i>';
 
             const body = document.createElement('span');
             body.className = 'history-body';
 
             const exprEl = document.createElement('span');
             exprEl.className = 'history-expression';
-            exprEl.textContent = pretty(item.expression) + ' =';
+            exprEl.textContent = isCrypto ? item.expression : pretty(item.expression) + ' =';
 
             const resEl = document.createElement('span');
             resEl.className = 'history-result';
-            resEl.textContent = pretty(item.result);
+            resEl.textContent = isCrypto ? item.result : pretty(item.result);
 
             body.append(exprEl, resEl);
             li.append(icon, body);
 
-            const use = () => dispatch(() => {
-                state.expr = item.result;
-                state.error = null;
-                state.justEvaluated = false;
-                render();
-            });
+            const use = isCrypto
+                ? () => copyText(item.result)
+                : () => dispatch(() => {
+                    if (state.mode === 'crypto') setMode(item.mode, true);
+                    state.expr = item.result;
+                    state.error = null;
+                    state.justEvaluated = false;
+                    render();
+                });
             li.addEventListener('click', use);
             li.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -489,7 +510,7 @@
     }
 
     function setMode(mode, animate) {
-        state.mode = mode === 'scientific' ? 'scientific' : 'standard';
+        state.mode = MODES.includes(mode) ? mode : 'standard';
         storage.set('mode', state.mode);
 
         el.modeButtons.forEach((btn) => {
@@ -498,16 +519,91 @@
             btn.setAttribute('aria-selected', String(active));
         });
 
-        Object.entries(el.keypads).forEach(([name, pad]) => {
-            const show = name === state.mode;
-            pad.hidden = !show;
-            if (show && animate) {
-                pad.classList.remove('flip-in');
-                void pad.offsetWidth; // ulang animasi
-                pad.classList.add('flip-in');
-            }
+        const showKeypad = () => {
+            const crypto = state.mode === 'crypto';
+            Object.entries(el.keypads).forEach(([name, pad]) => { pad.hidden = name !== state.mode; });
+            el.calcDisplay.hidden = crypto;
+            el.keypadWrapper.hidden = crypto;
+            el.keyboardHint.hidden = crypto;
+            el.cryptoPanel.hidden = !crypto;
+            // Lepas fokus dari kolom kripto agar shortcut keyboard kalkulator langsung aktif.
+            if (!crypto && el.cryptoPanel.contains(document.activeElement)) document.activeElement.blur();
+            render();
+        };
+
+        if (!animate || reduceMotion) {
+            showKeypad();
+            return;
+        }
+
+        // Flip kartu 3D: putar keluar → ganti keypad → putar masuk.
+        el.card.classList.remove('card-flip-in', 'is-tilting');
+        el.card.classList.add('card-flip-out');
+        afterAnimation(el.card, () => {
+            el.card.classList.remove('card-flip-out');
+            showKeypad();
+            el.card.classList.add('card-flip-in');
+            afterAnimation(el.card, () => el.card.classList.remove('card-flip-in'));
         });
-        render();
+    }
+
+    /** Jalankan fn setelah animasi CSS elemen ini selesai (abaikan animasi anak). */
+    function afterAnimation(node, fn) {
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
+            node.removeEventListener('animationend', onEnd);
+            fn();
+        };
+        const onEnd = (e) => { if (e.target === node) finish(); };
+        node.addEventListener('animationend', onEnd);
+        setTimeout(finish, 700); // cadangan bila animasi tidak berjalan
+    }
+
+    /** Ulang animasi CSS dengan memasang ulang class-nya. */
+    function replayAnimation(node, cls) {
+        node.classList.remove('anim-result', 'anim-error');
+        void node.offsetWidth;
+        node.classList.add(cls);
+    }
+
+    // ---------- Efek miring 3D mengikuti kursor ----------
+
+    function setupTilt() {
+        const canTilt = window.matchMedia('(hover: hover) and (pointer: fine)').matches && !reduceMotion;
+        if (!canTilt) return;
+
+        document.querySelectorAll('.tilt').forEach((card) => {
+            const max = Number(card.dataset.tilt) || 6;
+            let rect = null;
+
+            card.addEventListener('pointerenter', () => { rect = card.getBoundingClientRect(); });
+            card.addEventListener('pointermove', (e) => {
+                if (card.classList.contains('card-flip-out') || card.classList.contains('card-flip-in')) return;
+                // Jangan goyangkan formulir saat mengetik di mode kriptografi.
+                if (card === el.card && state.mode === 'crypto') {
+                    card.classList.remove('is-tilting');
+                    return;
+                }
+                rect = rect || card.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width;   // 0..1
+                const y = (e.clientY - rect.top) / rect.height;   // 0..1
+                card.style.setProperty('--ry', ((x - 0.5) * 2 * max).toFixed(2) + 'deg');
+                card.style.setProperty('--rx', ((0.5 - y) * 2 * max).toFixed(2) + 'deg');
+                card.style.setProperty('--gx', (x * 100).toFixed(1) + '%');
+                card.style.setProperty('--gy', (y * 100).toFixed(1) + '%');
+                card.classList.add('is-tilting');
+            });
+            card.addEventListener('pointerleave', () => {
+                rect = null;
+                card.classList.remove('is-tilting');
+            });
+        });
+
+        window.addEventListener('scroll', () => {
+            document.querySelectorAll('.tilt').forEach((c) => c.classList.remove('is-tilting'));
+        }, { passive: true });
     }
 
     function toggleAngle() {
@@ -574,10 +670,25 @@
     }
 
     document.querySelectorAll('.keypad .key').forEach((key) => {
-        key.addEventListener('click', () => {
+        const press = () => {
             playClick();
             if (key.dataset.insert !== undefined) dispatch(() => insert(key.dataset.insert));
             else if (key.dataset.action) dispatch(() => handleAction(key.dataset.action));
+        };
+        let pointerPressedAt = 0;
+
+        // Mouse: proses saat ditekan. Tombol bergerak (efek 3D) saat ditekan,
+        // sehingga "click" bisa hilang bila mouse dilepas di luar tombol.
+        key.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'mouse' || e.button !== 0) return;
+            e.preventDefault(); // jangan pindahkan fokus
+            pointerPressedAt = Date.now();
+            press();
+        });
+        // Sentuh, pena, dan keyboard (Enter/Spasi pada tombol) tetap lewat "click".
+        key.addEventListener('click', () => {
+            if (Date.now() - pointerPressedAt < 1000) return; // sudah diproses di pointerdown
+            press();
         });
     });
 
@@ -613,7 +724,8 @@
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         const tag = (e.target.tagName || '').toLowerCase();
-        if (tag === 'input' || tag === 'textarea') return;
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        if (state.mode === 'crypto') return; // keyboard hanya untuk kalkulator angka
 
         let handled = true;
         if (/^\d$/.test(e.key)) dispatch(() => insert(e.key));
@@ -633,9 +745,165 @@
         }
     });
 
+    // ---------- Kriptografi ----------
+
+    async function copyText(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (e) {
+            // Cadangan untuk browser/HTTP tanpa Clipboard API.
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (err) { /* abaikan */ }
+            ta.remove();
+        }
+        showToast('Disalin ke clipboard');
+    }
+
+    function setupCrypto() {
+        const panel = el.cryptoPanel;
+        const forms = panel.querySelectorAll('.crypto-form');
+        const toolButtons = panel.querySelectorAll('.tool-btn');
+        const out = {
+            box: document.getElementById('cryptoOutput'),
+            error: document.getElementById('cryptoError'),
+            result: document.getElementById('cryptoResult'),
+            details: document.getElementById('cryptoDetails'),
+            steps: document.getElementById('cryptoSteps'),
+            stepsBox: document.getElementById('cryptoStepsBox'),
+            copy: document.getElementById('cryptoCopy'),
+            reuse: document.getElementById('cryptoReuse'),
+        };
+        let lastResult = '';
+        let busy = false;
+
+        const activeForm = () => [...forms].find((f) => !f.hidden);
+
+        function clearOutput() {
+            out.box.hidden = true;
+            out.error.hidden = true;
+        }
+
+        function setTool(tool) {
+            toolButtons.forEach((b) => b.classList.toggle('active', b.dataset.tool === tool));
+            forms.forEach((f) => { f.hidden = f.dataset.tool !== tool; });
+            storage.set('cryptoTool', tool);
+            clearOutput();
+        }
+
+        // Tampilkan hanya kolom yang dipakai operasi modular terpilih.
+        function updateFields(form) {
+            const select = form.querySelector('[data-switch]');
+            if (!select) return;
+            const op = select.value;
+            form.querySelectorAll('[data-for]').forEach((field) => {
+                field.hidden = !field.dataset.for.split(' ').includes(op);
+            });
+            const labelA = form.querySelector('[data-label-a]');
+            if (labelA) labelA.textContent = op === 'totient' || op === 'prime' ? 'n' : 'a';
+            const labelB = form.querySelector('[data-label-b]');
+            if (labelB) labelB.textContent = op === 'powmod' ? 'b (eksponen)' : 'b';
+        }
+
+        function renderOutput(data) {
+            lastResult = data.result;
+            out.result.textContent = data.result;
+            out.details.replaceChildren();
+            (data.details || []).forEach((d) => {
+                const dt = document.createElement('dt');
+                dt.textContent = d.label;
+                const dd = document.createElement('dd');
+                dd.textContent = d.value;
+                dd.title = 'Klik untuk menyalin';
+                dd.addEventListener('click', () => copyText(d.value));
+                out.details.append(dt, dd);
+            });
+            out.steps.replaceChildren();
+            (data.steps || []).forEach((s) => {
+                const li = document.createElement('li');
+                li.textContent = s;
+                out.steps.appendChild(li);
+            });
+            out.stepsBox.hidden = !(data.steps || []).length;
+            out.error.hidden = true;
+            out.box.hidden = false;
+            replayAnimation(out.result, 'anim-result');
+        }
+
+        function showError(message) {
+            out.box.hidden = true;
+            out.error.textContent = message;
+            out.error.hidden = false;
+            replayAnimation(out.error, 'anim-error');
+        }
+
+        forms.forEach((form) => {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (busy) return;
+
+                const payload = Object.fromEntries(new FormData(form).entries());
+                // Tombol yang diklik menentukan aksi (Enkripsi/Dekripsi/…).
+                const submitter = e.submitter || form.querySelector('[type="submit"]');
+                if (submitter && submitter.name) payload[submitter.name] = submitter.value;
+
+                busy = true;
+                form.classList.add('is-busy');
+                try {
+                    const data = await api(config.routes.crypto[form.dataset.endpoint], 'POST', payload);
+                    renderOutput(data);
+                    state.history = data.history;
+                    renderHistory();
+                } catch (err) {
+                    showError(err.message);
+                } finally {
+                    busy = false;
+                    form.classList.remove('is-busy');
+                }
+            });
+
+            const select = form.querySelector('[data-switch]');
+            if (select) {
+                select.addEventListener('change', () => { updateFields(form); clearOutput(); });
+                updateFields(form);
+            }
+
+            const example = form.querySelector('[data-example]');
+            if (example) {
+                example.addEventListener('click', () => {
+                    Object.entries(JSON.parse(example.dataset.example)).forEach(([name, value]) => {
+                        if (form.elements[name]) form.elements[name].value = value;
+                    });
+                    if (form.elements.format) form.elements.format.value = 'number';
+                });
+            }
+        });
+
+        toolButtons.forEach((btn) => btn.addEventListener('click', () => setTool(btn.dataset.tool)));
+
+        out.copy.addEventListener('click', () => copyText(lastResult));
+        out.reuse.addEventListener('click', () => {
+            const form = activeForm();
+            const target = form && (form.querySelector('[data-main]') || form.elements.a);
+            if (!target) return;
+            target.value = lastResult;
+            target.focus();
+            showToast('Hasil dipindah ke kolom input');
+        });
+
+        const savedTool = storage.get('cryptoTool', 'modular');
+        setTool([...toolButtons].some((b) => b.dataset.tool === savedTool) ? savedTool : 'modular');
+    }
+
     // ---------- Inisialisasi ----------
     renderSoundToggle();
     renderThemeToggle();
     renderHistory();
+    setupCrypto();
     setMode(state.mode, false);
+    setupTilt();
 })();

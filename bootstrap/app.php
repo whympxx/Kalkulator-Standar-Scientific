@@ -11,7 +11,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Spasi di awal/akhir adalah bagian dari data untuk hash & cipher.
+        $middleware->trimStrings(except: ['text', 'message', 'key']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

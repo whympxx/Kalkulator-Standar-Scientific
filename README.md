@@ -26,6 +26,14 @@
 - Memori **MC, MR, M+, M−** dengan indikator `M`.
 - Pindah mode dengan animasi flip; mode terakhir diingat browser.
 
+### 🔐 Kalkulator Kriptografi
+Mode ketiga dengan langkah pengerjaan untuk setiap hasil:
+- **Aritmetika modular**: `a mod n`, pangkat modular `aᵇ mod n` (square-and-multiply), invers modular, GCD + Euclid diperluas (identitas Bézout), cek bilangan prima (Miller-Rabin) + faktorisasi, fungsi Euler `φ(n)`. Mendukung angka besar (hingga 400 digit).
+- **RSA**: buat kunci dari `p`, `q`, `e` (atau `e` otomatis), enkripsi/dekripsi angka atau teks.
+- **Cipher klasik**: Caesar (termasuk brute force), Vigenère, Affine.
+- **Hash & encoding**: MD5, SHA-1, SHA-256, SHA-512, SHA3-256, CRC32, Base64, Hex.
+- Tombol salin hasil dan "pakai hasil sebagai input" untuk mencoba enkripsi → dekripsi.
+
 ### 🧠 Mesin Hitung di Server
 - Ekspresi dihitung oleh **parser ekspresi milik sendiri** (recursive-descent) di Laravel — tidak memakai `eval()`, jadi aman dari injeksi kode.
 - Prioritas operator yang benar (`2+3×4 = 14`), pangkat asosiatif kanan, perkalian implisit (`2π`, `3(4+1)`), kurung ditutup otomatis.
@@ -50,7 +58,7 @@
 
 | Kebutuhan | Versi |
 |-----------|-------|
-| PHP | 8.2+ (ekstensi `mbstring`, `openssl`, `fileinfo`) |
+| PHP | 8.2+ (ekstensi `bcmath`, `mbstring`, `openssl`, `fileinfo`) |
 | Composer | 2.x |
 | Browser | Chrome / Firefox / Safari / Edge modern |
 
@@ -99,13 +107,21 @@ Setelah menekan `=`, menekan operator akan melanjutkan dari hasil (`Ans`), sedan
 ```
 app/
 ├── Http/Controllers/CalculatorController.php   # halaman, hitung, riwayat
+├── Http/Controllers/CryptoController.php       # endpoint kriptografi
 ├── Http/Requests/CalculateRequest.php          # validasi input
-└── Services/Calculator/
-    ├── Tokenizer.php            # memecah teks jadi token
-    ├── ExpressionEvaluator.php  # parser & evaluator ekspresi
-    ├── ResultFormatter.php      # merapikan hasil (0.3, 1e+21, ...)
-    ├── HistoryRepository.php    # riwayat di session
-    └── CalculationException.php
+└── Services/
+    ├── Calculator/
+    │   ├── Tokenizer.php            # memecah teks jadi token
+    │   ├── ExpressionEvaluator.php  # parser & evaluator ekspresi
+    │   ├── ResultFormatter.php      # merapikan hasil (0.3, 1e+21, ...)
+    │   ├── HistoryRepository.php    # riwayat di session
+    │   └── CalculationException.php
+    └── Crypto/
+        ├── BigMath.php              # bilangan besar (bcmath), Miller-Rabin, Euclid
+        ├── ModularCalculator.php    # aritmetika modular + langkah
+        ├── RsaCalculator.php        # kunci, enkripsi, dekripsi RSA
+        ├── ClassicCipher.php        # Caesar, Vigenère, Affine
+        └── HashCalculator.php       # hash, Base64, Hex
 resources/views/calculator.blade.php            # tampilan
 public/css/calculator.css                       # gaya + tema
 public/js/calculator.js                         # logika tombol & keyboard
@@ -123,6 +139,12 @@ legacy/                                         # versi PHP lama (arsip)
 | `POST` | `/calculate` | Body JSON `{ expression, mode: standard\|scientific, angle: deg\|rad }` → `{ expression, result, history }`, atau `422 { message }` bila error |
 | `GET` | `/history` | Daftar riwayat |
 | `DELETE` | `/history` | Hapus riwayat |
+| `POST` | `/crypto/modular` | `{ operation: mod\|powmod\|inverse\|gcd\|prime\|totient, a, b?, n? }` |
+| `POST` | `/crypto/rsa` | `{ action: keys\|encrypt\|decrypt, p, q, e?, message?, format: number\|text }` |
+| `POST` | `/crypto/cipher` | `{ cipher: caesar\|vigenere\|affine, action: encrypt\|decrypt\|bruteforce, text, shift?, key?, a?, b? }` |
+| `POST` | `/crypto/hash` | `{ action: hash\|base64_encode\|base64_decode\|hex_encode\|hex_decode, text }` |
+
+Endpoint kriptografi mengembalikan `{ summary, result, details[], steps[], history }`.
 
 Semua endpoint memakai proteksi CSRF Laravel dan dibatasi 120 request/menit.
 
@@ -132,7 +154,7 @@ Semua endpoint memakai proteksi CSRF Laravel dan dibatasi 120 request/menit.
 php artisan test
 ```
 
-Mencakup 60+ kasus mesin hitung (prioritas operator, trigonometri, persen, error domain, input berbahaya) dan pengujian endpoint (validasi, riwayat, batas riwayat, escaping XSS).
+Mencakup 120+ test: mesin hitung (prioritas operator, trigonometri, persen, error domain, input berbahaya), kriptografi (dicocokkan dengan contoh buku teks, mis. RSA p=61, q=53, e=17 → d=2753; Vigenère "ATTACK AT DAWN" + LEMON → "LXFOPV EF RNHR"), dan endpoint (validasi, riwayat, escaping XSS).
 
 ## 📄 License
 
