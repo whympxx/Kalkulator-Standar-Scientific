@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Services\Calculator\CalculationException;
 use App\Services\Calculator\HistoryRepository;
+use App\Services\Crypto\BaseConverter;
 use App\Services\Crypto\ClassicCipher;
 use App\Services\Crypto\CryptoResult;
 use App\Services\Crypto\HashCalculator;
 use App\Services\Crypto\ModularCalculator;
 use App\Services\Crypto\RsaCalculator;
+use App\Services\Crypto\XorCipher;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -69,6 +71,31 @@ class CryptoController extends Controller
         ], $this->messages());
 
         return $this->respond(fn () => $cipher->calculate($data['cipher'], $data['action'], $data['text'], $data));
+    }
+
+    public function base(Request $request, BaseConverter $converter): JsonResponse
+    {
+        $data = $request->validate([
+            'value' => ['required', 'string', 'max:'.self::MAX_DIGITS],
+            'from_base' => ['required', 'integer', 'between:2,36'],
+            'to_base' => ['required', 'integer', 'between:2,36'],
+        ], $this->messages() + [
+            'between' => 'Basis harus antara 2 dan 36.',
+            'integer' => 'Basis harus bilangan bulat.',
+        ]);
+
+        return $this->respond(fn () => $converter->convert($data['value'], (int) $data['from_base'], (int) $data['to_base']));
+    }
+
+    public function xor(Request $request, XorCipher $cipher): JsonResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', Rule::in(['encrypt', 'decrypt'])],
+            'text' => ['required', 'string', 'max:'.self::MAX_TEXT * 2],
+            'key' => ['required', 'string', 'max:200'],
+        ], $this->messages());
+
+        return $this->respond(fn () => $cipher->calculate($data['action'], $data['text'], $data['key']));
     }
 
     public function hash(Request $request, HashCalculator $calculator): JsonResponse

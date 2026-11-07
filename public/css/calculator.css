@@ -108,7 +108,7 @@ button { font: inherit; color: inherit; }
 
 .mode-switch {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 0.4rem;
     padding: 0.3rem;
     background: var(--surface-2);
@@ -118,9 +118,13 @@ button { font: inherit; color: inherit; }
 .mode-btn {
     border: none;
     border-radius: 11px;
-    padding: 0.6rem 0.25rem;
-    font-size: 0.92rem;
+    padding: 0.45rem 0.2rem;
+    font-size: 0.78rem;
     white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
     background: transparent;
     color: var(--text-muted);
     font-weight: 600;
@@ -306,7 +310,7 @@ button { font: inherit; color: inherit; }
 
 .crypto-tools {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 0.4rem;
     margin-bottom: 1rem;
 }
@@ -315,9 +319,10 @@ button { font: inherit; color: inherit; }
     background: var(--surface-2);
     color: var(--text-muted);
     border-radius: 10px;
-    padding: 0.5rem 0.3rem;
-    font-size: 0.85rem;
+    padding: 0.5rem 0.15rem;
+    font-size: 0.76rem;
     font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
     transition: background 0.2s, color 0.2s, transform 0.1s;
 }
@@ -429,6 +434,100 @@ button { font: inherit; color: inherit; }
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+
+/* ===== Pratinjau hasil ===== */
+.display-preview {
+    min-height: 1.3em;
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity 0.2s;
+}
+.display-preview.is-stale { opacity: 0.45; }
+
+/* ===== Konversi basis ===== */
+.base-row { align-items: flex-end; }
+.swap-btn { flex: 0 0 auto; height: 42px; }
+
+/* ===== Riwayat: tombol aksi ===== */
+.history-actions { display: flex; gap: 0.6rem; margin-top: 1rem; }
+.history-actions .btn-clear-history { margin-top: 0; flex: 1; }
+.btn-export {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.8rem 1rem;
+    border-radius: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--key-fn-text);
+    background: var(--key-fn);
+    transition: transform 0.15s, opacity 0.2s;
+}
+.btn-export:hover { transform: scale(1.02); }
+.btn-export.is-disabled { opacity: 0.45; pointer-events: none; }
+
+/* ===== Grafik ===== */
+.graph[hidden] { display: none; }
+.graph-fn { display: flex; align-items: center; gap: 0.5rem; }
+.graph-fn-label { font-family: 'Fira Mono', Consolas, monospace; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+.graph-fn input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+    font-family: 'Fira Mono', Consolas, monospace;
+}
+.graph-fn input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+.swatch {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    background: var(--c);
+    flex: 0 0 auto;
+    margin-right: 0.35rem;
+    vertical-align: -1px;
+}
+.graph-fn .swatch { margin-right: 0; }
+.graph-range .field input { padding: 0.5rem 0.6rem; }
+.field-row.graph-range { flex-direction: row; }
+.graph-canvas-wrap {
+    position: relative;
+    margin-top: 1rem;
+    border-radius: 14px;
+    background: var(--surface-2);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    transition: opacity 0.2s;
+}
+.graph-canvas-wrap.is-busy { opacity: 0.6; }
+.graph-canvas-wrap canvas { display: block; width: 100%; touch-action: none; cursor: crosshair; }
+.graph-canvas-wrap canvas:active { cursor: grabbing; }
+.graph-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.78rem;
+    font-family: 'Fira Mono', Consolas, monospace;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    white-space: nowrap;
+}
+.graph-tooltip[hidden] { display: none; }
+.graph .crypto-error { white-space: pre-line; }
+.graph-hint { font-size: 0.78rem; color: var(--text-muted); margin: 0.75rem 0 0; }
+.graph-hint code { background: var(--surface-2); padding: 0 0.25rem; border-radius: 4px; }
 
 /* ===== Efek 3D ===== */
 .topbar, .layout { position: relative; z-index: 1; }
@@ -582,7 +681,7 @@ button { font: inherit; color: inherit; }
     .display-value { font-size: 2rem; }
     .hint { display: none; }
     .cube-float:nth-child(n + 4) { display: none; }
-    .mode-btn { font-size: 0.85rem; padding: 0.55rem 0.2rem; }
+    .mode-btn { font-size: 0.72rem; padding: 0.45rem 0.1rem; }
     .field-row { flex-direction: column; }
 }
 

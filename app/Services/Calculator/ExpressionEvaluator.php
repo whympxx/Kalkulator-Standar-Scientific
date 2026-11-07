@@ -31,6 +31,9 @@ class ExpressionEvaluator
 
     private bool $degrees = true;
 
+    /** Nilai variabel x (hanya dipakai saat menggambar grafik). */
+    private ?float $x = null;
+
     public function __construct(private readonly Tokenizer $tokenizer = new Tokenizer) {}
 
     /**
@@ -38,18 +41,63 @@ class ExpressionEvaluator
      */
     public function evaluate(string $expression, string $angleMode = 'deg'): float
     {
+        $this->prepare($expression, $angleMode);
+        $this->x = null;
+
+        return $this->run();
+    }
+
+    /**
+     * Hitung f(x) untuk banyak nilai x sekaligus (untuk grafik).
+     * Titik yang tidak terdefinisi (mis. log(0), tan(π/2)) bernilai null.
+     *
+     * @param  list<float>  $xs
+     * @return list<float|null>
+     *
+     * @throws CalculationException bila tidak ada satu titik pun yang bisa dihitung
+     */
+    public function evaluateSeries(string $expression, array $xs, string $angleMode = 'rad'): array
+    {
+        $this->prepare($expression, $angleMode);
+        $results = [];
+        $firstError = null;
+
+        foreach ($xs as $x) {
+            $this->x = $x;
+            try {
+                $results[] = $this->run();
+            } catch (CalculationException $e) {
+                $firstError ??= $e;
+                $results[] = null;
+            }
+        }
+
+        $this->x = null;
+
+        if ($firstError !== null && array_filter($results, fn ($y) => $y !== null) === []) {
+            throw $firstError;
+        }
+
+        return $results;
+    }
+
+    private function prepare(string $expression, string $angleMode): void
+    {
         if (mb_strlen($expression) > self::MAX_LENGTH) {
             throw new CalculationException('Ekspresi terlalu panjang (maks. '.self::MAX_LENGTH.' karakter).');
         }
 
         $this->degrees = $angleMode !== 'rad';
         $this->tokens = $this->tokenizer->tokenize($expression);
-        $this->pos = 0;
 
         if ($this->tokens === []) {
             throw new CalculationException('Ekspresi masih kosong.');
         }
+    }
 
+    private function run(): float
+    {
+        $this->pos = 0;
         $value = $this->parseExpression();
 
         if ($this->peek() !== null) {
@@ -99,8 +147,8 @@ class ExpressionEvaluator
 
                 $value = $op === '*' ? $value * $right : $value / $right;
                 $isPercent = false;
-            } elseif (in_array($this->peek()['type'] ?? null, ['num', 'const', 'func', 'lparen'], true)) {
-                // Perkalian implisit: 2π, 3(4+1), (1+1)(2+2), 2sin(30)
+            } elseif (in_array($this->peek()['type'] ?? null, ['num', 'const', 'var', 'func', 'lparen'], true)) {
+                // Perkalian implisit: 2π, 3(4+1), (1+1)(2+2), 2sin(30), 3x
                 $value *= $this->parsePower();
                 $isPercent = false;
             } else {
@@ -168,6 +216,13 @@ class ExpressionEvaluator
             case 'num':
             case 'const':
                 return $token['value'];
+
+            case 'var':
+                if ($this->x === null) {
+                    throw new CalculationException('Variabel x hanya bisa dipakai di mode Grafik.');
+                }
+
+                return $this->x;
 
             case 'lparen':
                 $value = $this->parseExpression();
