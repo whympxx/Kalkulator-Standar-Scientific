@@ -8,16 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### 🚀 Planned Features
-- Dark/Light theme switcher
-- Keyboard shortcuts support
 - Gesture support for mobile
 - Export/Import calculations
-- Calculator themes marketplace
 - PWA (Progressive Web App) support
-- Voice input for calculations
 
-### 🐛 Known Issues
-- None currently
+## [3.0.0] - 2026-11-07
+
+### 🔧 Changed
+- **Dibangun ulang dengan Laravel 12.** Versi PHP lama dipindah ke folder `legacy/`.
+- Perhitungan dilakukan di server oleh parser ekspresi yang aman (tanpa `eval`) lewat `POST /calculate` (AJAX). Halaman tidak lagi reload setiap menekan `=`.
+- Mode Standar dan Scientific memakai satu layar dan satu riwayat (ditandai ikon mode). Riwayat menyimpan 10 perhitungan terakhir.
+- Bootstrap dihapus; CSS ditulis ulang dengan variabel tema.
+
+### ✨ Added
+- Tema gelap/terang, dukungan keyboard, tombol backspace (⌫), kurung `( )`, pangkat `xʸ`, `1/x`, `sin⁻¹ cos⁻¹ tan⁻¹`, mode sudut DEG/RAD, indikator memori, klik riwayat untuk memakai hasilnya lagi.
+- Persen bergaya kalkulator: `200 + 10% = 220`.
+- Test otomatis (PHPUnit) untuk mesin hitung dan endpoint.
+
+### 🐛 Fixed
+- Setiap `=` dan setiap fungsi scientific me-reload halaman: hasil langsung hilang, mode kembali ke Standar, memori dan riwayat scientific terhapus.
+- Tombol Scientific juga ikut diproses kalkulator Standar (event listener ganda), sehingga satu klik diproses dua kali.
+- Pesan `Err: ÷0` tidak pernah terlihat karena langsung ditimpa `0`.
+- File suara tidak ada (404) sehingga muncul error di console setiap klik; diganti suara Web Audio + tombol mute.
+- Faktorial desimal/negatif salah, dan faktorial angka besar membuat browser hang.
+- `tan(90)` menghasilkan angka raksasa, hasil `NaN` ikut tersimpan ke riwayat, angka sangat kecil dibulatkan menjadi 0.
+- Grid tombol Scientific berantakan (baris terakhir meluber), CSS Bootstrap menimpa CSS kustom, dan konten terpotong di layar kecil karena `body` dikunci `height: 100vh`.
+- Tombol ± dan % tidak bisa dipakai pada hasil perhitungan sebelumnya.
+- Riwayat bisa diisi data sembarang lewat POST tanpa validasi/CSRF.
 
 ## [2.0.0] - 2024-12-12
 
