@@ -76,7 +76,7 @@ class Tokenizer
      */
     private function splitIdentifier(string $word): array
     {
-        $names = [...self::FUNCTIONS, ...array_keys(self::CONSTANTS)];
+        $names = [...self::FUNCTIONS, ...array_keys(self::CONSTANTS), 'x'];
         // Nama terpanjang dulu agar "asin" tidak terbaca "a" + "sin".
         usort($names, fn ($a, $b) => strlen($b) <=> strlen($a));
 
@@ -84,9 +84,11 @@ class Tokenizer
         while ($word !== '') {
             foreach ($names as $name) {
                 if (str_starts_with($word, $name)) {
-                    $tokens[] = isset(self::CONSTANTS[$name])
-                        ? ['type' => 'const', 'value' => self::CONSTANTS[$name]]
-                        : ['type' => 'func', 'value' => $name];
+                    $tokens[] = match (true) {
+                        $name === 'x' => ['type' => 'var', 'value' => 'x'],
+                        isset(self::CONSTANTS[$name]) => ['type' => 'const', 'value' => self::CONSTANTS[$name]],
+                        default => ['type' => 'func', 'value' => $name],
+                    };
                     $word = substr($word, strlen($name));
 
                     continue 2;

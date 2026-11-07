@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export/Import calculations
 - PWA (Progressive Web App) support
 
+## [3.2.0] - 2026-11-07
+
+### ✨ Added
+- **Mode Grafik**: gambar hingga 3 fungsi f(x) dengan tooltip, zoom (scroll/tombol), geser (drag), sumbu y otomatis, dan penanganan asimtot.
+- **Pratinjau hasil langsung** saat mengetik (tidak masuk riwayat).
+- **Link berbagi** untuk perhitungan, grafik, dan alat kripto.
+- **Unduh riwayat sebagai CSV** (dengan proteksi CSV injection).
+- Alat kripto **XOR** dan **konversi basis bilangan 2–36** dengan langkah pengerjaan.
+
 ## [3.1.0] - 2026-11-07
 
 ### ✨ Added

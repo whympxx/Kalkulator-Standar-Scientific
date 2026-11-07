@@ -38,6 +38,9 @@
 <header class="topbar">
     <h1 class="brand"><i class="fa-solid fa-calculator"></i> {{ config('app.name', 'Kalkulator Modern') }}</h1>
     <div class="topbar-actions">
+        <button type="button" class="icon-btn" id="shareBtn" title="Salin link perhitungan ini">
+            <i class="fa-solid fa-share-nodes"></i>
+        </button>
         <button type="button" class="icon-btn" id="soundToggle" title="Suara tombol" aria-pressed="true">
             <i class="fa-solid fa-volume-high"></i>
         </button>
@@ -59,6 +62,38 @@
             <button type="button" role="tab" class="mode-btn" data-mode="crypto" aria-selected="false">
                 <i class="fa-solid fa-key"></i> Kriptografi
             </button>
+            <button type="button" role="tab" class="mode-btn" data-mode="graph" aria-selected="false">
+                <i class="fa-solid fa-chart-line"></i> Grafik
+            </button>
+        </div>
+
+        {{-- Panel grafik fungsi --}}
+        <div class="graph" id="graphPanel" hidden>
+            <form id="graphForm" class="crypto-form" novalidate>
+                @foreach (['f1' => ['#6366f1', 'sin(x)'], 'f2' => ['#f97316', 'x^2/10'], 'f3' => ['#10b981', '']] as $name => [$color, $default])
+                    <label class="graph-fn">
+                        <span class="swatch" style="--c: {{ $color }}"></span>
+                        <span class="graph-fn-label">{{ $loop->iteration === 1 ? 'f' : ($loop->iteration === 2 ? 'g' : 'h') }}(x) =</span>
+                        <input name="{{ $name }}" value="{{ $default }}" autocomplete="off" spellcheck="false" placeholder="{{ $loop->last ? 'opsional, mis. 1/x' : '' }}">
+                    </label>
+                @endforeach
+                <div class="field-row graph-range">
+                    <label class="field"><span>x min</span><input name="from" type="number" step="any" value="-10"></label>
+                    <label class="field"><span>x max</span><input name="to" type="number" step="any" value="10"></label>
+                </div>
+                <div class="crypto-actions">
+                    <button type="submit" class="btn-crypto primary"><i class="fa-solid fa-pen-ruler"></i> Gambar</button>
+                    <button type="button" class="btn-crypto" data-zoom="in" title="Perbesar"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                    <button type="button" class="btn-crypto" data-zoom="out" title="Perkecil"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                    <button type="button" class="btn-crypto" data-zoom="reset" title="Kembali ke -10 … 10"><i class="fa-solid fa-expand"></i></button>
+                </div>
+            </form>
+            <div class="graph-canvas-wrap" id="graphWrap">
+                <canvas id="graphCanvas" aria-label="Grafik fungsi"></canvas>
+                <div class="graph-tooltip" id="graphTooltip" hidden></div>
+            </div>
+            <div class="crypto-error" id="graphError" role="alert" hidden></div>
+            <p class="graph-hint">Pakai <b>x</b> sebagai variabel, contoh: <code>x^2-4</code>, <code>2sin(x)</code>, <code>sqrt(x)</code>, <code>1/x</code>. Sudut dalam radian. Gulir untuk zoom, seret untuk menggeser.</p>
         </div>
 
         {{-- Panel kriptografi --}}
@@ -69,6 +104,8 @@
                 <button type="button" class="tool-btn" data-tool="caesar"><i class="fa-solid fa-rotate"></i> Caesar</button>
                 <button type="button" class="tool-btn" data-tool="vigenere"><i class="fa-solid fa-table-cells"></i> Vigenère</button>
                 <button type="button" class="tool-btn" data-tool="affine"><i class="fa-solid fa-wave-square"></i> Affine</button>
+                <button type="button" class="tool-btn" data-tool="xor"><i class="fa-solid fa-xmark"></i> XOR</button>
+                <button type="button" class="tool-btn" data-tool="base"><i class="fa-solid fa-hashtag"></i> Basis</button>
                 <button type="button" class="tool-btn" data-tool="hash"><i class="fa-solid fa-fingerprint"></i> Hash</button>
             </div>
 
@@ -155,6 +192,44 @@
                 </div>
             </form>
 
+            {{-- XOR --}}
+            <form class="crypto-form" data-tool="xor" data-endpoint="xor" novalidate hidden>
+                <label class="field"><span>Teks (enkripsi) / Hex (dekripsi)</span><textarea name="text" rows="3" data-main placeholder="Hello"></textarea></label>
+                <label class="field"><span>Kunci</span><input name="key" autocomplete="off" placeholder="rahasia"></label>
+                <div class="crypto-actions">
+                    <button type="submit" class="btn-crypto primary" name="action" value="encrypt"><i class="fa-solid fa-lock"></i> Enkripsi</button>
+                    <button type="submit" class="btn-crypto primary" name="action" value="decrypt"><i class="fa-solid fa-lock-open"></i> Dekripsi</button>
+                </div>
+            </form>
+
+            {{-- Konversi basis bilangan --}}
+            @php
+                $baseNames = [2 => 'biner', 8 => 'oktal', 10 => 'desimal', 16 => 'heksa', 36 => 'base36'];
+            @endphp
+            <form class="crypto-form" data-tool="base" data-endpoint="base" novalidate hidden>
+                <label class="field"><span>Bilangan</span><input name="value" data-main autocomplete="off" spellcheck="false" placeholder="mis. 255 atau 0xFF"></label>
+                <div class="field-row base-row">
+                    <label class="field"><span>Dari basis</span>
+                        <select name="from_base">
+                            @for ($b = 2; $b <= 36; $b++)
+                                <option value="{{ $b }}" @selected($b === 10)>{{ $b }}{{ isset($baseNames[$b]) ? ' ('.$baseNames[$b].')' : '' }}</option>
+                            @endfor
+                        </select>
+                    </label>
+                    <button type="button" class="btn-crypto ghost swap-btn" data-swap title="Tukar basis"><i class="fa-solid fa-right-left"></i></button>
+                    <label class="field"><span>Ke basis</span>
+                        <select name="to_base">
+                            @for ($b = 2; $b <= 36; $b++)
+                                <option value="{{ $b }}" @selected($b === 2)>{{ $b }}{{ isset($baseNames[$b]) ? ' ('.$baseNames[$b].')' : '' }}</option>
+                            @endfor
+                        </select>
+                    </label>
+                </div>
+                <div class="crypto-actions">
+                    <button type="submit" class="btn-crypto primary"><i class="fa-solid fa-arrows-rotate"></i> Konversi</button>
+                </div>
+            </form>
+
             {{-- Hash & encoding --}}
             <form class="crypto-form" data-tool="hash" data-endpoint="hash" novalidate hidden>
                 <label class="field"><span>Teks</span><textarea name="text" rows="3" data-main placeholder="abc"></textarea></label>
@@ -193,6 +268,7 @@
             </div>
             <div class="display-expression" id="displayExpression">&nbsp;</div>
             <div class="display-value" id="displayValue">0</div>
+            <div class="display-preview" id="displayPreview" aria-label="Pratinjau hasil"></div>
         </div>
 
         <div class="keypad-wrapper" id="keypadWrapper">
@@ -290,9 +366,14 @@
         </div>
         <p class="history-empty" id="historyEmpty">Belum ada perhitungan.</p>
         <ul class="history-list" id="historyList"></ul>
-        <button type="button" class="btn-clear-history" id="clearHistory">
-            <i class="fa-solid fa-trash"></i> Hapus Riwayat
-        </button>
+        <div class="history-actions">
+            <a class="btn-export" id="exportHistory" href="{{ route('calculator.history.export') }}" download>
+                <i class="fa-solid fa-file-csv"></i> Unduh CSV
+            </a>
+            <button type="button" class="btn-clear-history" id="clearHistory">
+                <i class="fa-solid fa-trash"></i> Hapus Riwayat
+            </button>
+        </div>
         <p class="history-note">Klik riwayat untuk memakai hasilnya lagi (riwayat kriptografi disalin ke clipboard). Menyimpan {{ $historyLimit }} perhitungan terakhir.</p>
     </aside>
 </main>
@@ -305,12 +386,16 @@
         historyLimit: {{ $historyLimit }},
         routes: {
             calculate: @json(route('calculator.calculate', absolute: false)),
+            preview: @json(route('calculator.preview', absolute: false)),
+            plot: @json(route('calculator.plot', absolute: false)),
             history: @json(route('calculator.history', absolute: false)),
             crypto: {
                 modular: @json(route('crypto.modular', absolute: false)),
                 rsa: @json(route('crypto.rsa', absolute: false)),
                 cipher: @json(route('crypto.cipher', absolute: false)),
                 hash: @json(route('crypto.hash', absolute: false)),
+                base: @json(route('crypto.base', absolute: false)),
+                xor: @json(route('crypto.xor', absolute: false)),
             },
         },
     };

@@ -37,9 +37,15 @@
         keypadWrapper: document.getElementById('keypadWrapper'),
         keyboardHint: document.getElementById('keyboardHint'),
         cryptoPanel: document.getElementById('cryptoPanel'),
+        graphPanel: document.getElementById('graphPanel'),
+        preview: document.getElementById('displayPreview'),
+        shareBtn: document.getElementById('shareBtn'),
+        exportHistory: document.getElementById('exportHistory'),
     };
 
-    const MODES = ['standard', 'scientific', 'crypto'];
+    const MODES = ['standard', 'scientific', 'crypto', 'graph'];
+    /** Mode yang memakai panel formulir, bukan keypad. */
+    const isPanelMode = (mode) => mode === 'crypto' || mode === 'graph';
 
     const storage = {
         get(key, fallback) {
@@ -282,8 +288,7 @@
         if (expr === '' || expr === '-') return null;
 
         // Rapikan: buang operator menggantung & tutup kurung otomatis.
-        expr = expr.replace(/[+\-*/^]+$/, '');
-        expr += ')'.repeat(Math.max(0, (expr.match(/\(/g) || []).length - (expr.match(/\)/g) || []).length));
+        expr = tidyExpr(expr);
         if (expr === '') return null;
 
         state.busy = true;
@@ -440,6 +445,8 @@
         value.style.fontSize = len > 24 ? '1.3rem' : len > 16 ? '1.75rem' : '';
         value.scrollLeft = value.scrollWidth;
 
+        updatePreview();
+
         el.memoryIndicator.hidden = state.memory === 0;
         el.angleIndicator.hidden = state.mode !== 'scientific';
         el.angleIndicator.textContent = state.angle.toUpperCase();
@@ -486,7 +493,7 @@
             const use = isCrypto
                 ? () => copyText(item.result)
                 : () => dispatch(() => {
-                    if (state.mode === 'crypto') setMode(item.mode, true);
+                    if (isPanelMode(state.mode)) setMode(item.mode, true);
                     state.expr = item.result;
                     state.error = null;
                     state.justEvaluated = false;
@@ -506,6 +513,8 @@
         const empty = state.history.length === 0;
         el.historyEmpty.hidden = !empty;
         el.clearHistory.disabled = empty;
+        el.exportHistory.classList.toggle('is-disabled', empty);
+        el.exportHistory.setAttribute('aria-disabled', String(empty));
         el.historyCount.textContent = empty ? '' : state.history.length + '/' + config.historyLimit;
     }
 
@@ -520,15 +529,18 @@
         });
 
         const showKeypad = () => {
-            const crypto = state.mode === 'crypto';
+            const panel = isPanelMode(state.mode);
             Object.entries(el.keypads).forEach(([name, pad]) => { pad.hidden = name !== state.mode; });
-            el.calcDisplay.hidden = crypto;
-            el.keypadWrapper.hidden = crypto;
-            el.keyboardHint.hidden = crypto;
-            el.cryptoPanel.hidden = !crypto;
-            // Lepas fokus dari kolom kripto agar shortcut keyboard kalkulator langsung aktif.
-            if (!crypto && el.cryptoPanel.contains(document.activeElement)) document.activeElement.blur();
+            el.calcDisplay.hidden = panel;
+            el.keypadWrapper.hidden = panel;
+            el.keyboardHint.hidden = panel;
+            el.cryptoPanel.hidden = state.mode !== 'crypto';
+            el.graphPanel.hidden = state.mode !== 'graph';
+            // Lepas fokus dari kolom formulir agar shortcut keyboard kalkulator langsung aktif.
+            const active = document.activeElement;
+            if (!panel && (el.cryptoPanel.contains(active) || el.graphPanel.contains(active))) active.blur();
             render();
+            if (state.mode === 'graph') graph.show();
         };
 
         if (!animate || reduceMotion) {
@@ -582,7 +594,7 @@
             card.addEventListener('pointermove', (e) => {
                 if (card.classList.contains('card-flip-out') || card.classList.contains('card-flip-in')) return;
                 // Jangan goyangkan formulir saat mengetik di mode kriptografi.
-                if (card === el.card && state.mode === 'crypto') {
+                if (card === el.card && isPanelMode(state.mode)) {
                     card.classList.remove('is-tilting');
                     return;
                 }
@@ -713,6 +725,7 @@
         document.documentElement.dataset.theme = dark ? 'dark' : 'light';
         storage.set('theme', dark ? 'dark' : 'light');
         renderThemeToggle();
+        if (state.mode === 'graph') graph.draw();
     });
 
     const KEY_MAP = {
@@ -725,7 +738,7 @@
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         const tag = (e.target.tagName || '').toLowerCase();
         if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-        if (state.mode === 'crypto') return; // keyboard hanya untuk kalkulator angka
+        if (isPanelMode(state.mode)) return; // keyboard hanya untuk kalkulator angka
 
         let handled = true;
         if (/^\d$/.test(e.key)) dispatch(() => insert(e.key));
@@ -747,7 +760,7 @@
 
     // ---------- Kriptografi ----------
 
-    async function copyText(text) {
+    async function copyText(text, message = 'Disalin ke clipboard') {
         try {
             await navigator.clipboard.writeText(text);
         } catch (e) {
@@ -761,7 +774,7 @@
             try { document.execCommand('copy'); } catch (err) { /* abaikan */ }
             ta.remove();
         }
-        showToast('Disalin ke clipboard');
+        showToast(message);
     }
 
     function setupCrypto() {
@@ -872,6 +885,14 @@
                 updateFields(form);
             }
 
+            const swap = form.querySelector('[data-swap]');
+            if (swap) {
+                swap.addEventListener('click', () => {
+                    const { from_base: fromSel, to_base: toSel } = form.elements;
+                    [fromSel.value, toSel.value] = [toSel.value, fromSel.value];
+                });
+            }
+
             const example = form.querySelector('[data-example]');
             if (example) {
                 example.addEventListener('click', () => {
@@ -895,15 +916,475 @@
             showToast('Hasil dipindah ke kolom input');
         });
 
+        const hasTool = (tool) => [...toolButtons].some((b) => b.dataset.tool === tool);
         const savedTool = storage.get('cryptoTool', 'modular');
-        setTool([...toolButtons].some((b) => b.dataset.tool === savedTool) ? savedTool : 'modular');
+        setTool(hasTool(savedTool) ? savedTool : 'modular');
+
+        return {
+            currentTool: () => activeForm().dataset.tool,
+            setTool: (tool) => { if (hasTool(tool)) setTool(tool); },
+        };
     }
+
+    // ---------- Pratinjau hasil saat mengetik ----------
+
+    /** Buang operator menggantung dan tutup kurung yang masih terbuka. */
+    function tidyExpr(expr) {
+        const trimmed = expr.replace(/[+\-*/^]+$/, '');
+        const open = (trimmed.match(/\(/g) || []).length - (trimmed.match(/\)/g) || []).length;
+        return trimmed + ')'.repeat(Math.max(0, open));
+    }
+
+    let previewTimer = null;
+    let previewKey = null;
+    let previewSeq = 0;
+
+    function updatePreview() {
+        const expr = state.expr;
+        const wanted = !state.error && !state.justEvaluated && !state.busy
+            && expr !== '' && !isPlainNumber(expr) && tidyExpr(expr) !== '';
+
+        if (!wanted) {
+            clearTimeout(previewTimer);
+            previewKey = null;
+            el.preview.textContent = '';
+            return;
+        }
+
+        const key = expr + '|' + state.angle;
+        if (key === previewKey) return; // sudah dihitung / sedang menunggu
+        previewKey = key;
+        el.preview.classList.add('is-stale');
+
+        clearTimeout(previewTimer);
+        previewTimer = setTimeout(async () => {
+            const seq = ++previewSeq;
+            try {
+                const data = await api(config.routes.preview, 'POST', { expression: tidyExpr(expr), angle: state.angle });
+                if (seq !== previewSeq || state.expr !== expr || state.justEvaluated) return;
+                el.preview.textContent = data.result !== null ? '= ' + pretty(data.result) : '';
+                el.preview.classList.remove('is-stale');
+            } catch (e) { /* pratinjau bersifat opsional */ }
+        }, 250);
+    }
+
+    // ---------- Grafik fungsi ----------
+
+    function setupGraph() {
+        const form = document.getElementById('graphForm');
+        const canvas = document.getElementById('graphCanvas');
+        const wrap = document.getElementById('graphWrap');
+        const tooltip = document.getElementById('graphTooltip');
+        const errorBox = document.getElementById('graphError');
+        const ctx = canvas.getContext('2d');
+        const NAMES = ['f1', 'f2', 'f3'];
+        const LABELS = ['f', 'g', 'h'];
+        const COLORS = ['#6366f1', '#f97316', '#10b981'];
+        const LIMIT = 1e6;
+
+        let data = null;        // { x: [], series: [{ expression, y, error, color, label }] }
+        let view = null;        // { xMin, xMax, yMin, yMax }
+        let hoverIndex = null;
+        let drag = null;
+        let seq = 0;
+        let fetchTimer = null;
+        let loaded = false;
+
+        const range = () => ({
+            from: parseFloat(form.elements.from.value),
+            to: parseFloat(form.elements.to.value),
+        });
+
+        function setRange(from, to) {
+            form.elements.from.value = Number(from.toPrecision(6));
+            form.elements.to.value = Number(to.toPrecision(6));
+        }
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.hidden = false;
+        }
+
+        async function fetchData() {
+            const { from, to } = range();
+            if (!(Number.isFinite(from) && Number.isFinite(to) && to > from)) {
+                showError('Rentang x tidak valid: x max harus lebih besar dari x min.');
+                return;
+            }
+            const functions = NAMES.map((n) => form.elements[n].value.trim());
+            if (!functions.some(Boolean)) {
+                showError('Isi minimal satu fungsi, contoh: sin(x)');
+                return;
+            }
+            storage.set('graph', { functions, from, to });
+
+            const used = functions.map((f, i) => (f ? i : -1)).filter((i) => i >= 0);
+            const samples = Math.max(100, Math.min(1000, Math.round(wrap.clientWidth || 400)));
+            const mySeq = ++seq;
+            wrap.classList.add('is-busy');
+            try {
+                const res = await api(config.routes.plot, 'POST', { functions, from, to, samples });
+                if (mySeq !== seq) return;
+                res.series.forEach((s, i) => {
+                    s.color = COLORS[used[i]];
+                    s.label = LABELS[used[i]];
+                });
+                data = res;
+                computeView(from, to);
+                const errors = res.series.filter((s) => s.error).map((s) => `${s.label}(x) = ${s.expression}: ${s.error}`);
+                errorBox.hidden = errors.length === 0;
+                errorBox.textContent = errors.join('\n');
+                draw();
+            } catch (err) {
+                if (mySeq === seq) showError(err.message);
+            } finally {
+                if (mySeq === seq) wrap.classList.remove('is-busy');
+            }
+        }
+
+        function scheduleFetch() {
+            clearTimeout(fetchTimer);
+            fetchTimer = setTimeout(fetchData, 200);
+        }
+
+        /** Sumbu y otomatis; nilai ekstrem (mis. dekat asimtot 1/x) dipangkas. */
+        function computeView(from, to) {
+            const ys = [];
+            data.series.forEach((s) => (s.y || []).forEach((v) => { if (v !== null && Number.isFinite(v)) ys.push(v); }));
+            let yMin = -1;
+            let yMax = 1;
+            if (ys.length) {
+                ys.sort((a, b) => a - b);
+                const q = (p) => ys[Math.round(p * (ys.length - 1))];
+                yMin = q(0.02);
+                yMax = q(0.98);
+                const spread = yMax - yMin;
+                if (ys[0] >= yMin - spread) yMin = ys[0];
+                if (ys[ys.length - 1] <= yMax + spread) yMax = ys[ys.length - 1];
+                if (yMax - yMin < 1e-9) { yMin -= 1; yMax += 1; }
+                const pad = (yMax - yMin) * 0.08;
+                yMin -= pad;
+                yMax += pad;
+            }
+            view = { xMin: from, xMax: to, yMin, yMax };
+        }
+
+        function sizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const w = wrap.clientWidth || 300;
+            const h = Math.round(Math.min(360, Math.max(220, w * 0.72)));
+            canvas.style.height = h + 'px';
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            return { w, h };
+        }
+
+        function niceStep(span, count) {
+            const raw = span / Math.max(1, count);
+            const mag = 10 ** Math.floor(Math.log10(raw));
+            const n = raw / mag;
+            return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * mag;
+        }
+
+        function fmtTick(v, step) {
+            if (Math.abs(v) < step / 2) return '0';
+            const decimals = Math.min(6, Math.max(0, -Math.floor(Math.log10(step))));
+            return v.toFixed(decimals);
+        }
+
+        function fmtValue(v) {
+            if (v === null || !Number.isFinite(v)) return 'tidak terdefinisi';
+            return String(Number(v.toPrecision(6)));
+        }
+
+        function draw() {
+            const { w, h } = sizeCanvas();
+            const css = getComputedStyle(document.documentElement);
+            const colText = css.getPropertyValue('--text-muted').trim();
+            const colGrid = css.getPropertyValue('--border').trim();
+            const colAxis = css.getPropertyValue('--text').trim();
+            ctx.clearRect(0, 0, w, h);
+            if (!view) return;
+
+            const X = (x) => ((x - view.xMin) / (view.xMax - view.xMin)) * w;
+            const Y = (y) => h - ((y - view.yMin) / (view.yMax - view.yMin)) * h;
+            const sx = niceStep(view.xMax - view.xMin, w / 70);
+            const sy = niceStep(view.yMax - view.yMin, h / 45);
+            const xTicks = [];
+            const yTicks = [];
+            for (let x = Math.ceil(view.xMin / sx) * sx; x <= view.xMax; x += sx) xTicks.push(x);
+            for (let y = Math.ceil(view.yMin / sy) * sy; y <= view.yMax; y += sy) yTicks.push(y);
+
+            // Kisi
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = colGrid;
+            ctx.beginPath();
+            xTicks.forEach((x) => { const px = Math.round(X(x)) + 0.5; ctx.moveTo(px, 0); ctx.lineTo(px, h); });
+            yTicks.forEach((y) => { const py = Math.round(Y(y)) + 0.5; ctx.moveTo(0, py); ctx.lineTo(w, py); });
+            ctx.stroke();
+
+            // Sumbu
+            ctx.strokeStyle = colAxis;
+            ctx.globalAlpha = 0.75;
+            ctx.beginPath();
+            if (view.yMin <= 0 && view.yMax >= 0) { const py = Math.round(Y(0)) + 0.5; ctx.moveTo(0, py); ctx.lineTo(w, py); }
+            if (view.xMin <= 0 && view.xMax >= 0) { const px = Math.round(X(0)) + 0.5; ctx.moveTo(px, 0); ctx.lineTo(px, h); }
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            // Label angka
+            ctx.font = '11px system-ui, sans-serif';
+            ctx.fillStyle = colText;
+            const labelY = Math.min(Math.max(Y(0) + 13, 13), h - 4);
+            ctx.textAlign = 'center';
+            // Label yang terlalu dekat tepi kanvas dilewati agar tidak terpotong.
+            xTicks.forEach((x) => {
+                const px = X(x);
+                if (Math.abs(x) >= sx / 2 && px > 14 && px < w - 14) ctx.fillText(fmtTick(x, sx), px, labelY);
+            });
+            const labelX = Math.min(Math.max(X(0) + 4, 4), w - 44);
+            ctx.textAlign = 'left';
+            yTicks.forEach((y) => {
+                const py = Y(y);
+                if (Math.abs(y) >= sy / 2 && py > 14 && py < h - 4) ctx.fillText(fmtTick(y, sy), labelX, py - 3);
+            });
+
+            // Kurva
+            if (!data) return;
+            const span = view.yMax - view.yMin;
+            data.series.forEach((s) => {
+                if (!s.y) return;
+                ctx.strokeStyle = s.color;
+                ctx.lineWidth = 2.2;
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                let pen = false;
+                let prevY = null;
+                let prevPy = null;
+                s.y.forEach((y, i) => {
+                    if (y === null || !Number.isFinite(y)) { pen = false; prevY = null; return; }
+                    const px = X(data.x[i]);
+                    const py = Y(y);
+                    // Putuskan garis di asimtot (mis. tan, 1/x) agar tidak ada garis tegak palsu.
+                    if (prevY !== null) {
+                        const crossed = (prevPy < 0 && py > h) || (prevPy > h && py < 0);
+                        if (crossed || Math.abs(y - prevY) > span * 3) pen = false;
+                    }
+                    const cy = Math.max(-h, Math.min(2 * h, py));
+                    if (pen) ctx.lineTo(px, cy); else ctx.moveTo(px, cy);
+                    pen = true;
+                    prevY = y;
+                    prevPy = py;
+                });
+                ctx.stroke();
+            });
+
+            // Garis bantu & titik saat kursor di atas grafik
+            if (hoverIndex !== null && data.x[hoverIndex] !== undefined) {
+                const px = X(data.x[hoverIndex]);
+                ctx.strokeStyle = colText;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(px, 0);
+                ctx.lineTo(px, h);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                data.series.forEach((s) => {
+                    const y = s.y && s.y[hoverIndex];
+                    if (y === null || y === undefined || !Number.isFinite(y)) return;
+                    ctx.fillStyle = s.color;
+                    ctx.beginPath();
+                    ctx.arc(px, Y(y), 4.5, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+        }
+
+        function updateTooltip(clientX, clientY) {
+            if (hoverIndex === null || !data) {
+                tooltip.hidden = true;
+                return;
+            }
+            tooltip.replaceChildren();
+            const head = document.createElement('div');
+            head.textContent = 'x = ' + fmtValue(data.x[hoverIndex]);
+            tooltip.appendChild(head);
+            data.series.filter((s) => s.y).forEach((s) => {
+                const row = document.createElement('div');
+                const dot = document.createElement('span');
+                dot.className = 'swatch';
+                dot.style.setProperty('--c', s.color);
+                row.append(dot, `${s.label}(x) = ${fmtValue(s.y[hoverIndex])}`);
+                tooltip.appendChild(row);
+            });
+            const r = wrap.getBoundingClientRect();
+            const left = clientX - r.left;
+            tooltip.hidden = false;
+            tooltip.style.left = Math.min(left + 12, r.width - tooltip.offsetWidth - 4) + 'px';
+            tooltip.style.top = Math.max(4, clientY - r.top - tooltip.offsetHeight - 10) + 'px';
+        }
+
+        function zoom(factor, anchorFraction = 0.5) {
+            const { from, to } = range();
+            if (!(to > from)) return;
+            const anchor = from + (to - from) * anchorFraction;
+            let nextFrom = anchor - (anchor - from) * factor;
+            let nextTo = anchor + (to - anchor) * factor;
+            if (nextTo - nextFrom < 1e-6) return;
+            nextFrom = Math.max(-LIMIT, nextFrom);
+            nextTo = Math.min(LIMIT, nextTo);
+            setRange(nextFrom, nextTo);
+            if (view) { view.xMin = nextFrom; view.xMax = nextTo; draw(); }
+            scheduleFetch();
+        }
+
+        // ----- Event -----
+        form.addEventListener('submit', (e) => { e.preventDefault(); fetchData(); });
+        form.querySelectorAll('[data-zoom]').forEach((btn) => btn.addEventListener('click', () => {
+            if (btn.dataset.zoom === 'reset') { setRange(-10, 10); fetchData(); return; }
+            zoom(btn.dataset.zoom === 'in' ? 1 / 1.5 : 1.5);
+        }));
+
+        canvas.addEventListener('wheel', (e) => {
+            if (!view) return;
+            e.preventDefault();
+            const r = canvas.getBoundingClientRect();
+            zoom(e.deltaY > 0 ? 1.2 : 1 / 1.2, (e.clientX - r.left) / r.width);
+        }, { passive: false });
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if (!view) return;
+            const { from, to } = range();
+            drag = { x: e.clientX, from, to, moved: false };
+            canvas.setPointerCapture(e.pointerId);
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            const r = canvas.getBoundingClientRect();
+            if (drag) {
+                const dx = e.clientX - drag.x;
+                if (Math.abs(dx) > 2) drag.moved = true;
+                if (drag.moved) {
+                    const shift = (-dx / r.width) * (drag.to - drag.from);
+                    const nextFrom = Math.max(-LIMIT, drag.from + shift);
+                    const nextTo = nextFrom + (drag.to - drag.from);
+                    setRange(nextFrom, nextTo);
+                    view.xMin = nextFrom;
+                    view.xMax = nextTo;
+                    hoverIndex = null;
+                    tooltip.hidden = true;
+                    draw();
+                    return;
+                }
+            }
+            if (!data) return;
+            const fx = (e.clientX - r.left) / r.width;
+            const xValue = view.xMin + fx * (view.xMax - view.xMin);
+            const step = (data.x[data.x.length - 1] - data.x[0]) / (data.x.length - 1);
+            const idx = Math.round((xValue - data.x[0]) / step);
+            hoverIndex = idx >= 0 && idx < data.x.length ? idx : null;
+            draw();
+            updateTooltip(e.clientX, e.clientY);
+        });
+
+        const endDrag = () => {
+            if (drag && drag.moved) fetchData();
+            drag = null;
+        };
+        canvas.addEventListener('pointerup', endDrag);
+        canvas.addEventListener('pointercancel', endDrag);
+        canvas.addEventListener('pointerleave', () => {
+            if (drag) return;
+            hoverIndex = null;
+            tooltip.hidden = true;
+            draw();
+        });
+
+        window.addEventListener('resize', () => { if (state.mode === 'graph') draw(); });
+
+        function load(functions, from, to) {
+            NAMES.forEach((n, i) => { form.elements[n].value = functions[i] || ''; });
+            const a = parseFloat(from);
+            const b = parseFloat(to);
+            if (Number.isFinite(a) && Number.isFinite(b) && b > a) setRange(a, b);
+        }
+
+        return {
+            draw,
+            load(functions, from, to) {
+                load(functions, from, to);
+                loaded = false;
+                this.fromUrl = true;
+            },
+            show() {
+                if (!loaded) {
+                    loaded = true;
+                    const saved = storage.get('graph', null);
+                    if (!this.fromUrl && saved && Array.isArray(saved.functions)) load(saved.functions, saved.from, saved.to);
+                    fetchData();
+                } else {
+                    draw();
+                }
+            },
+            params() {
+                const out = [];
+                NAMES.forEach((n) => { const v = form.elements[n].value.trim(); if (v) out.push(['f', v]); });
+                const { from, to } = range();
+                out.push(['from', String(from)], ['to', String(to)]);
+                return out;
+            },
+        };
+    }
+
+    // ---------- Link berbagi ----------
+
+    function buildShareUrl() {
+        const params = new URLSearchParams();
+        params.set('mode', state.mode);
+        if (state.mode === 'standard' || state.mode === 'scientific') {
+            const expr = state.justEvaluated ? state.lastExpr : state.expr;
+            if (expr) params.set('expr', expr);
+            if (state.mode === 'scientific') params.set('angle', state.angle);
+        } else if (state.mode === 'graph') {
+            graph.params().forEach(([k, v]) => params.append(k, v));
+        } else if (state.mode === 'crypto') {
+            params.set('tool', crypto.currentTool());
+        }
+        return location.origin + location.pathname + '?' + params.toString();
+    }
+
+    function loadFromUrl() {
+        const params = new URLSearchParams(location.search);
+        if (!params.toString()) return;
+
+        const mode = params.get('mode');
+        if (MODES.includes(mode)) state.mode = mode;
+        const angle = params.get('angle');
+        if (angle === 'deg' || angle === 'rad') state.angle = angle;
+        const expr = params.get('expr');
+        if (expr) {
+            state.expr = expr.slice(0, 200);
+            state.justEvaluated = false;
+            state.error = null;
+        }
+        const tool = params.get('tool');
+        if (tool) crypto.setTool(tool);
+        if (params.has('f') || params.has('from')) graph.load(params.getAll('f'), params.get('from'), params.get('to'));
+
+        // Bersihkan alamat agar refresh tidak memuat ulang link.
+        history.replaceState(null, '', location.pathname);
+    }
+
+    el.shareBtn.addEventListener('click', () => copyText(buildShareUrl(), 'Link disalin — tempel untuk membagikan'));
 
     // ---------- Inisialisasi ----------
     renderSoundToggle();
     renderThemeToggle();
     renderHistory();
-    setupCrypto();
+    const crypto = setupCrypto();
+    const graph = setupGraph();
+    loadFromUrl();
     setMode(state.mode, false);
     setupTilt();
 })();

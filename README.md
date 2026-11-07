@@ -26,11 +26,22 @@
 - Memori **MC, MR, M+, M−** dengan indikator `M`.
 - Pindah mode dengan animasi flip; mode terakhir diingat browser.
 
+### 📈 Grafik Fungsi
+- Gambar hingga 3 fungsi sekaligus, mis. `sin(x)`, `x^2/10`, `1/x`.
+- Tooltip nilai saat kursor di atas grafik, zoom dengan scroll / tombol, geser dengan drag.
+- Sumbu y otomatis, garis tidak tersambung palsu di asimtot (tan, 1/x).
+
+### ⚡ Fitur Praktis
+- **Pratinjau langsung**: hasil muncul saat mengetik, sebelum menekan `=`.
+- **Link berbagi**: tombol 🔗 menyalin link yang membuka perhitungan/grafik yang sama.
+- **Unduh riwayat CSV** (aman dari CSV injection, terbaca rapi di Excel).
+
 ### 🔐 Kalkulator Kriptografi
 Mode ketiga dengan langkah pengerjaan untuk setiap hasil:
 - **Aritmetika modular**: `a mod n`, pangkat modular `aᵇ mod n` (square-and-multiply), invers modular, GCD + Euclid diperluas (identitas Bézout), cek bilangan prima (Miller-Rabin) + faktorisasi, fungsi Euler `φ(n)`. Mendukung angka besar (hingga 400 digit).
 - **RSA**: buat kunci dari `p`, `q`, `e` (atau `e` otomatis), enkripsi/dekripsi angka atau teks.
-- **Cipher klasik**: Caesar (termasuk brute force), Vigenère, Affine.
+- **Cipher klasik**: Caesar (termasuk brute force), Vigenère, Affine, XOR.
+- **Konversi basis** 2–36 (biner, oktal, heksa, …) dengan langkah pembagian berulang.
 - **Hash & encoding**: MD5, SHA-1, SHA-256, SHA-512, SHA3-256, CRC32, Base64, Hex.
 - Tombol salin hasil dan "pakai hasil sebagai input" untuk mencoba enkripsi → dekripsi.
 
@@ -121,7 +132,9 @@ app/
         ├── ModularCalculator.php    # aritmetika modular + langkah
         ├── RsaCalculator.php        # kunci, enkripsi, dekripsi RSA
         ├── ClassicCipher.php        # Caesar, Vigenère, Affine
-        └── HashCalculator.php       # hash, Base64, Hex
+        ├── HashCalculator.php       # hash, Base64, Hex
+        ├── XorCipher.php            # cipher XOR
+        └── BaseConverter.php        # konversi basis 2–36
 resources/views/calculator.blade.php            # tampilan
 public/css/calculator.css                       # gaya + tema
 public/js/calculator.js                         # logika tombol & keyboard
@@ -139,6 +152,11 @@ legacy/                                         # versi PHP lama (arsip)
 | `POST` | `/calculate` | Body JSON `{ expression, mode: standard\|scientific, angle: deg\|rad }` → `{ expression, result, history }`, atau `422 { message }` bila error |
 | `GET` | `/history` | Daftar riwayat |
 | `DELETE` | `/history` | Hapus riwayat |
+| `POST` | `/preview` | Seperti `/calculate` tapi tidak disimpan ke riwayat |
+| `POST` | `/plot` | `{ functions: [..maks 3], from, to, samples? }` → `{ x[], series[{ expression, y[] \| error }] }` |
+| `GET` | `/history/export` | Unduh riwayat (CSV) |
+| `POST` | `/crypto/base` | `{ value, from_base, to_base }` |
+| `POST` | `/crypto/xor` | `{ action: encrypt\|decrypt, text, key }` |
 | `POST` | `/crypto/modular` | `{ operation: mod\|powmod\|inverse\|gcd\|prime\|totient, a, b?, n? }` |
 | `POST` | `/crypto/rsa` | `{ action: keys\|encrypt\|decrypt, p, q, e?, message?, format: number\|text }` |
 | `POST` | `/crypto/cipher` | `{ cipher: caesar\|vigenere\|affine, action: encrypt\|decrypt\|bruteforce, text, shift?, key?, a?, b? }` |
@@ -154,7 +172,7 @@ Semua endpoint memakai proteksi CSRF Laravel dan dibatasi 120 request/menit.
 php artisan test
 ```
 
-Mencakup 120+ test: mesin hitung (prioritas operator, trigonometri, persen, error domain, input berbahaya), kriptografi (dicocokkan dengan contoh buku teks, mis. RSA p=61, q=53, e=17 → d=2753; Vigenère "ATTACK AT DAWN" + LEMON → "LXFOPV EF RNHR"), dan endpoint (validasi, riwayat, escaping XSS).
+Mencakup 130+ test: mesin hitung (prioritas operator, trigonometri, persen, error domain, input berbahaya), kriptografi (dicocokkan dengan contoh buku teks, mis. RSA p=61, q=53, e=17 → d=2753; Vigenère "ATTACK AT DAWN" + LEMON → "LXFOPV EF RNHR"), dan endpoint (validasi, riwayat, escaping XSS).
 
 ## 📄 License
 
