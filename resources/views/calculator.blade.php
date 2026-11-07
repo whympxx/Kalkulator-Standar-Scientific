@@ -18,6 +18,23 @@
     <link rel="stylesheet" href="{{ asset('css/calculator.css') }}">
 </head>
 <body>
+{{-- Kubus 3D dekoratif di latar belakang --}}
+<div class="bg-scene" aria-hidden="true">
+    @foreach ([
+        ['s' => 90,  'x' => '6%',  'y' => '14%', 't' => '26s', 'd' => '0s'],
+        ['s' => 60,  'x' => '86%', 'y' => '10%', 't' => '20s', 'd' => '-4s'],
+        ['s' => 120, 'x' => '78%', 'y' => '68%', 't' => '34s', 'd' => '-9s'],
+        ['s' => 50,  'x' => '14%', 'y' => '78%', 't' => '18s', 'd' => '-2s'],
+        ['s' => 70,  'x' => '48%', 'y' => '88%', 't' => '24s', 'd' => '-12s'],
+    ] as $cube)
+        <div class="cube-float" style="--x: {{ $cube['x'] }}; --y: {{ $cube['y'] }}; --d: {{ $cube['d'] }};">
+            <div class="cube" style="--s: {{ $cube['s'] }}px; --t: {{ $cube['t'] }};">
+                <span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+        </div>
+    @endforeach
+</div>
+
 <header class="topbar">
     <h1 class="brand"><i class="fa-solid fa-calculator"></i> {{ config('app.name', 'Kalkulator Modern') }}</h1>
     <div class="topbar-actions">
@@ -31,7 +48,7 @@
 </header>
 
 <main class="layout">
-    <section class="calculator" aria-label="Kalkulator">
+    <section class="calculator tilt" data-tilt="8" aria-label="Kalkulator">
         <div class="mode-switch" role="tablist" aria-label="Mode kalkulator">
             <button type="button" role="tab" class="mode-btn active" data-mode="standard" aria-selected="true">
                 <i class="fa-solid fa-calculator"></i> Standar
@@ -39,9 +56,137 @@
             <button type="button" role="tab" class="mode-btn" data-mode="scientific" aria-selected="false">
                 <i class="fa-solid fa-flask"></i> Scientific
             </button>
+            <button type="button" role="tab" class="mode-btn" data-mode="crypto" aria-selected="false">
+                <i class="fa-solid fa-key"></i> Kriptografi
+            </button>
         </div>
 
-        <div class="display" aria-live="polite">
+        {{-- Panel kriptografi --}}
+        <div class="crypto" id="cryptoPanel" hidden>
+            <div class="crypto-tools" role="tablist" aria-label="Alat kriptografi">
+                <button type="button" class="tool-btn active" data-tool="modular"><i class="fa-solid fa-percent"></i> Modular</button>
+                <button type="button" class="tool-btn" data-tool="rsa"><i class="fa-solid fa-key"></i> RSA</button>
+                <button type="button" class="tool-btn" data-tool="caesar"><i class="fa-solid fa-rotate"></i> Caesar</button>
+                <button type="button" class="tool-btn" data-tool="vigenere"><i class="fa-solid fa-table-cells"></i> Vigenère</button>
+                <button type="button" class="tool-btn" data-tool="affine"><i class="fa-solid fa-wave-square"></i> Affine</button>
+                <button type="button" class="tool-btn" data-tool="hash"><i class="fa-solid fa-fingerprint"></i> Hash</button>
+            </div>
+
+            {{-- Aritmetika modular --}}
+            <form class="crypto-form" data-tool="modular" data-endpoint="modular" novalidate>
+                <label class="field">
+                    <span>Operasi</span>
+                    <select name="operation" data-switch>
+                        <option value="powmod">Pangkat modular: aᵇ mod n</option>
+                        <option value="mod">Sisa bagi: a mod n</option>
+                        <option value="inverse">Invers modular: a⁻¹ mod n</option>
+                        <option value="gcd">GCD &amp; Euclid diperluas</option>
+                        <option value="prime">Cek bilangan prima</option>
+                        <option value="totient">Fungsi Euler φ(n)</option>
+                    </select>
+                </label>
+                <div class="field-row">
+                    <label class="field"><span data-label-a>a</span><input name="a" inputmode="numeric" autocomplete="off" placeholder="mis. 4"></label>
+                    <label class="field" data-for="powmod gcd"><span data-label-b>b</span><input name="b" inputmode="numeric" autocomplete="off" placeholder="mis. 13"></label>
+                    <label class="field" data-for="mod powmod inverse"><span>n (modulus)</span><input name="n" inputmode="numeric" autocomplete="off" placeholder="mis. 497"></label>
+                </div>
+                <div class="crypto-actions">
+                    <button type="submit" class="btn-crypto primary">Hitung</button>
+                </div>
+            </form>
+
+            {{-- RSA --}}
+            <form class="crypto-form" data-tool="rsa" data-endpoint="rsa" novalidate hidden>
+                <div class="field-row">
+                    <label class="field"><span>p (prima)</span><input name="p" inputmode="numeric" autocomplete="off" placeholder="61"></label>
+                    <label class="field"><span>q (prima)</span><input name="q" inputmode="numeric" autocomplete="off" placeholder="53"></label>
+                    <label class="field"><span>e (opsional)</span><input name="e" inputmode="numeric" autocomplete="off" placeholder="otomatis"></label>
+                </div>
+                <label class="field">
+                    <span>Format pesan</span>
+                    <select name="format">
+                        <option value="number">Angka (m &lt; n)</option>
+                        <option value="text">Teks (per karakter)</option>
+                    </select>
+                </label>
+                <label class="field"><span>Pesan / cipherteks</span><textarea name="message" rows="2" data-main placeholder="mis. 65 — atau angka cipherteks dipisah spasi"></textarea></label>
+                <div class="crypto-actions">
+                    <button type="submit" class="btn-crypto" name="action" value="keys">Buat Kunci</button>
+                    <button type="submit" class="btn-crypto primary" name="action" value="encrypt"><i class="fa-solid fa-lock"></i> Enkripsi</button>
+                    <button type="submit" class="btn-crypto primary" name="action" value="decrypt"><i class="fa-solid fa-lock-open"></i> Dekripsi</button>
+                    <button type="button" class="btn-crypto ghost" data-example='{"p":"61","q":"53","e":"17","message":"65"}'>Contoh</button>
+                </div>
+            </form>
+
+            {{-- Caesar --}}
+            <form class="crypto-form" data-tool="caesar" data-endpoint="cipher" novalidate hidden>
+                <input type="hidden" name="cipher" value="caesar">
+                <label class="field"><span>Teks</span><textarea name="text" rows="3" data-main placeholder="Hello, World!"></textarea></label>
+                <label class="field field-small"><span>Geseran (k)</span><input name="shift" type="number" value="3"></label>
+                <div class="crypto-actions">
+                    <button type="submit" class="btn-crypto primary" name="action" value="encrypt"><i class="fa-solid fa-lock"></i> Enkripsi</button>
+                    <button type="submit" class="btn-crypto primary" name="action" value="decrypt"><i class="fa-solid fa-lock-open"></i> Dekripsi</button>
+                    <button type="submit" class="btn-crypto" name="action" value="bruteforce"><i class="fa-solid fa-hammer"></i> Brute force</button>
+                </div>
+            </form>
+
+            {{-- Vigenère --}}
+            <form class="crypto-form" data-tool="vigenere" data-endpoint="cipher" novalidate hidden>
+                <input type="hidden" name="cipher" value="vigenere">
+                <label class="field"><span>Teks</span><textarea name="text" rows="3" data-main placeholder="ATTACK AT DAWN"></textarea></label>
+                <label class="field"><span>Kunci</span><input name="key" autocomplete="off" placeholder="LEMON"></label>
+                <div class="crypto-actions">
+                    <button type="submit" class="btn-crypto primary" name="action" value="encrypt"><i class="fa-solid fa-lock"></i> Enkripsi</button>
+                    <button type="submit" class="btn-crypto primary" name="action" value="decrypt"><i class="fa-solid fa-lock-open"></i> Dekripsi</button>
+                </div>
+            </form>
+
+            {{-- Affine --}}
+            <form class="crypto-form" data-tool="affine" data-endpoint="cipher" novalidate hidden>
+                <input type="hidden" name="cipher" value="affine">
+                <label class="field"><span>Teks</span><textarea name="text" rows="3" data-main placeholder="AFFINE CIPHER"></textarea></label>
+                <div class="field-row">
+                    <label class="field"><span>a (koprima 26)</span><input name="a" type="number" value="5"></label>
+                    <label class="field"><span>b</span><input name="b" type="number" value="8"></label>
+                </div>
+                <div class="crypto-actions">
+                    <button type="submit" class="btn-crypto primary" name="action" value="encrypt"><i class="fa-solid fa-lock"></i> Enkripsi</button>
+                    <button type="submit" class="btn-crypto primary" name="action" value="decrypt"><i class="fa-solid fa-lock-open"></i> Dekripsi</button>
+                </div>
+            </form>
+
+            {{-- Hash & encoding --}}
+            <form class="crypto-form" data-tool="hash" data-endpoint="hash" novalidate hidden>
+                <label class="field"><span>Teks</span><textarea name="text" rows="3" data-main placeholder="abc"></textarea></label>
+                <div class="crypto-actions">
+                    <button type="submit" class="btn-crypto primary" name="action" value="hash"><i class="fa-solid fa-fingerprint"></i> Hash</button>
+                    <button type="submit" class="btn-crypto" name="action" value="base64_encode">Base64 →</button>
+                    <button type="submit" class="btn-crypto" name="action" value="base64_decode">← Base64</button>
+                    <button type="submit" class="btn-crypto" name="action" value="hex_encode">Hex →</button>
+                    <button type="submit" class="btn-crypto" name="action" value="hex_decode">← Hex</button>
+                </div>
+            </form>
+
+            <div class="crypto-error" id="cryptoError" role="alert" hidden></div>
+
+            <div class="crypto-output" id="cryptoOutput" hidden>
+                <div class="crypto-output-head">
+                    <span><i class="fa-solid fa-square-check"></i> Hasil</span>
+                    <div>
+                        <button type="button" class="icon-btn small" id="cryptoReuse" title="Pakai hasil sebagai input"><i class="fa-solid fa-arrow-turn-up"></i></button>
+                        <button type="button" class="icon-btn small" id="cryptoCopy" title="Salin hasil"><i class="fa-regular fa-copy"></i></button>
+                    </div>
+                </div>
+                <output class="crypto-result" id="cryptoResult"></output>
+                <dl class="crypto-details" id="cryptoDetails"></dl>
+                <details class="crypto-steps" id="cryptoStepsBox" open>
+                    <summary>Langkah pengerjaan</summary>
+                    <ol id="cryptoSteps"></ol>
+                </details>
+            </div>
+        </div>
+
+        <div class="display" id="calcDisplay" aria-live="polite">
             <div class="display-status">
                 <span id="angleIndicator" class="badge" hidden>DEG</span>
                 <span id="memoryIndicator" class="badge" hidden title="Ada nilai di memori">M</span>
@@ -50,7 +195,7 @@
             <div class="display-value" id="displayValue">0</div>
         </div>
 
-        <div class="keypad-wrapper">
+        <div class="keypad-wrapper" id="keypadWrapper">
             {{-- Keypad standar --}}
             <div class="keypad keypad-standard" id="keypadStandard" data-keypad="standard">
                 <button class="key key-clear" data-action="clear" title="Hapus semua (Esc)">AC</button>
@@ -135,10 +280,10 @@
             </div>
         </div>
 
-        <p class="hint"><i class="fa-regular fa-keyboard"></i> Bisa pakai keyboard: angka, + − * / ^ ( ) ! %, Enter, Backspace, Esc.</p>
+        <p class="hint" id="keyboardHint"><i class="fa-regular fa-keyboard"></i> Bisa pakai keyboard: angka, + − * / ^ ( ) ! %, Enter, Backspace, Esc.</p>
     </section>
 
-    <aside class="history" aria-label="Riwayat perhitungan">
+    <aside class="history tilt" data-tilt="4" aria-label="Riwayat perhitungan">
         <div class="history-header">
             <h2><i class="fa-solid fa-clock-rotate-left"></i> Riwayat</h2>
             <span class="history-count" id="historyCount"></span>
@@ -148,7 +293,7 @@
         <button type="button" class="btn-clear-history" id="clearHistory">
             <i class="fa-solid fa-trash"></i> Hapus Riwayat
         </button>
-        <p class="history-note">Klik salah satu riwayat untuk memakai hasilnya lagi. Menyimpan {{ $historyLimit }} perhitungan terakhir.</p>
+        <p class="history-note">Klik riwayat untuk memakai hasilnya lagi (riwayat kriptografi disalin ke clipboard). Menyimpan {{ $historyLimit }} perhitungan terakhir.</p>
     </aside>
 </main>
 
@@ -161,6 +306,12 @@
         routes: {
             calculate: @json(route('calculator.calculate', absolute: false)),
             history: @json(route('calculator.history', absolute: false)),
+            crypto: {
+                modular: @json(route('crypto.modular', absolute: false)),
+                rsa: @json(route('crypto.rsa', absolute: false)),
+                cipher: @json(route('crypto.cipher', absolute: false)),
+                hash: @json(route('crypto.hash', absolute: false)),
+            },
         },
     };
 </script>

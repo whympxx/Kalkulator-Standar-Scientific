@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export/Import calculations
 - PWA (Progressive Web App) support
 
+## [3.1.0] - 2026-11-07
+
+### ✨ Added
+- **Mode Kriptografi**: aritmetika modular (mod, pangkat modular, invers, GCD/Euclid diperluas, cek prima, φ(n)), RSA (kunci, enkripsi, dekripsi angka/teks), Caesar (+ brute force), Vigenère, Affine, hash (MD5, SHA-1, SHA-256, SHA-512, SHA3-256, CRC32), Base64 dan Hex. Setiap hasil disertai langkah pengerjaan dan masuk riwayat.
+- **Animasi 3D**: kartu miring mengikuti kursor dengan efek parallax, flip kartu saat ganti mode, hasil berputar seperti jam flip, kubus 3D di latar belakang.
+
+### 🐛 Fixed
+- Klik mouse bisa tidak terbaca ketika tombol bergerak (efek 3D) saat ditekan; tombol kini merespons pada saat mouse ditekan.
+
 ## [3.0.0] - 2026-11-07
 
 ### 🔧 Changed

@@ -11,6 +11,9 @@ class HistoryRepository
 {
     public const LIMIT = 10;
 
+    /** Panjang maksimal teks yang disimpan per entri (hasil kripto bisa panjang). */
+    private const MAX_TEXT = 2000;
+
     private const KEY = 'calculator.history';
 
     public function __construct(private readonly Session $session) {}
@@ -28,8 +31,8 @@ class HistoryRepository
         $history = $this->all();
 
         array_unshift($history, [
-            'expression' => $expression,
-            'result' => $result,
+            'expression' => mb_strimwidth($expression, 0, self::MAX_TEXT, '…'),
+            'result' => mb_strimwidth($result, 0, self::MAX_TEXT, '…'),
             'mode' => $mode,
             'time' => now()->toIso8601String(),
         ]);
