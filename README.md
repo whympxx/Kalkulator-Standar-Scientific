@@ -5,7 +5,7 @@
 [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-> **Kalkulator web modern berbasis Laravel dengan mode Standar dan Scientific, riwayat perhitungan, tema gelap/terang, dukungan keyboard, dan tampilan responsif.**
+> **Kalkulator web modern berbasis Laravel dengan 4 mode — Standar, Scientific, Grafik fungsi, dan Kriptografi (lengkap dengan langkah pengerjaan) — plus pratinjau hasil langsung, link berbagi, ekspor riwayat CSV, animasi 3D, tema gelap/terang, dukungan keyboard, dan tampilan responsif.**
 
 ## 📋 Daftar Isi
 
@@ -19,7 +19,7 @@
 
 ## ✨ Fitur
 
-### 🧮 Dua Mode Kalkulator
+### 🧮 Mode Standar & Scientific
 - **Standar**: `+ − × ÷`, persen, ±, backspace.
 - **Scientific**: `sin cos tan`, `sin⁻¹ cos⁻¹ tan⁻¹`, `log ln`, `eˣ`, `√`, `x²`, `xʸ`, `n!`, `1/x`, kurung `( )`, konstanta `π` dan `e`.
 - Mode sudut **DEG / RAD**.
