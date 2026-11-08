@@ -7,8 +7,22 @@
 
 > **Kalkulator web modern berbasis Laravel dengan 4 mode — Standar, Scientific, Grafik fungsi, dan Kriptografi (lengkap dengan langkah pengerjaan) — plus pratinjau hasil langsung, link berbagi, ekspor riwayat CSV, animasi 3D, tema gelap/terang, dukungan keyboard, dan tampilan responsif.**
 
+## 📸 Tampilan
+
+| Standar (pratinjau hasil + riwayat) | Scientific (tema gelap) |
+|:---:|:---:|
+| ![Mode Standar](docs/screenshots/standar.png) | ![Mode Scientific tema gelap](docs/screenshots/scientific-dark.png) |
+| **Grafik fungsi** | **Kriptografi RSA dengan langkah pengerjaan** |
+| ![Mode Grafik](docs/screenshots/grafik.png) | ![Mode Kriptografi RSA](docs/screenshots/kriptografi.png) |
+
+<p align="center">
+  <img src="docs/screenshots/mobile.png" alt="Tampilan di HP" width="280"><br>
+  <em>Tampilan di HP</em>
+</p>
+
 ## 📋 Daftar Isi
 
+- [📸 Tampilan](#-tampilan)
 - [✨ Fitur](#-fitur)
 - [🚀 Instalasi](#-instalasi)
 - [💻 Penggunaan](#-penggunaan)
@@ -53,11 +67,12 @@ Mode ketiga dengan langkah pengerjaan untuk setiap hasil:
 - Pesan error yang jelas: bagi nol, akar negatif, log ≤ 0, `tan(90°)`, faktorial bukan bilangan bulat, dll.
 
 ### 📊 Riwayat
-- Menyimpan **10 perhitungan terakhir** di session Laravel (tetap ada setelah halaman di-refresh).
-- Klik salah satu riwayat untuk memakai hasilnya lagi.
-- Hapus riwayat dengan konfirmasi.
+- Menyimpan **10 perhitungan terakhir** dari semua mode (Standar, Scientific, Kriptografi) di session Laravel, ditandai ikon mode, dan tetap ada setelah halaman di-refresh.
+- Klik riwayat angka untuk memakai hasilnya lagi; klik riwayat kriptografi untuk menyalin hasilnya.
+- Unduh riwayat sebagai CSV, atau hapus riwayat dengan konfirmasi.
 
-### 🎨 Tampilan
+### 🎨 Desain
+- **Animasi 3D**: kartu miring mengikuti kursor, flip saat ganti mode, hasil berputar seperti jam flip, kubus 3D di latar.
 - Tema **gelap/terang** (mengikuti sistem, bisa diganti manual).
 - Responsif untuk desktop, tablet, dan HP.
 - Suara klik (Web Audio, tanpa file eksternal) yang bisa dimatikan.
@@ -113,6 +128,12 @@ Buka **http://localhost:8000**.
 
 Setelah menekan `=`, menekan operator akan melanjutkan dari hasil (`Ans`), sedangkan menekan angka memulai perhitungan baru.
 
+**Mode Grafik** — tulis fungsi memakai variabel `x` (mis. `x^2-4`, `2sin(x)`, `sqrt(x)`), atur `x min`/`x max`, lalu tekan **Gambar**. Arahkan kursor untuk melihat nilai, gulir untuk zoom, seret untuk menggeser. Sudut di mode grafik memakai radian.
+
+**Mode Kriptografi** — pilih alat (Modular, RSA, Caesar, Vigenère, Affine, XOR, Basis, Hash), isi kolomnya (RSA punya tombol **Contoh**), lalu lihat hasil beserta *Langkah pengerjaan*. Tombol ⤴ memakai hasil sebagai input berikutnya (mis. enkripsi → dekripsi).
+
+**Link berbagi** — tombol 🔗 di pojok kanan atas menyalin link yang langsung membuka mode, ekspresi, atau grafik yang sedang tampil.
+
 ## 🏗️ Struktur Proyek
 
 ```
@@ -141,6 +162,7 @@ public/js/calculator.js                         # logika tombol & keyboard
 routes/web.php
 tests/Unit/ExpressionEvaluatorTest.php
 tests/Feature/CalculatorTest.php
+docs/screenshots/                               # gambar tampilan untuk README
 legacy/                                         # versi PHP lama (arsip)
 ```
 

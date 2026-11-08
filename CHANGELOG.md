@@ -9,8 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🚀 Planned Features
 - Gesture support for mobile
-- Export/Import calculations
+- Import riwayat dari CSV
 - PWA (Progressive Web App) support
+
+### 📚 Documentation
+- README kini memuat screenshot tampilan (Standar, Scientific gelap, Grafik, Kriptografi, HP) dan panduan mode Grafik, Kriptografi, serta link berbagi.
 
 ## [3.2.0] - 2026-11-07
 
@@ -142,6 +145,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Type | Description |
 |---------|------|------|-------------|
+| **3.2.0** | 2026-11-07 | Minor | Mode Grafik, pratinjau langsung, link berbagi, CSV, XOR, konversi basis |
+| **3.1.0** | 2026-11-07 | Minor | Mode Kriptografi + animasi 3D |
+| **3.0.0** | 2026-11-07 | Major | Dibangun ulang dengan Laravel 12 |
 | **2.0.0** | 2024-12-12 | Major | Scientific calculator + dual mode |
 | **1.5.0** | 2024-11-15 | Minor | Enhanced UI/UX and animations |
 | **1.0.0** | 2024-10-20 | Major | Initial stable release |
